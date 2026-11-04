@@ -15,6 +15,7 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
     <script>
         tailwind.config = {
@@ -114,6 +115,10 @@
             }
         };
 
+        const SUPABASE_URL = 'https://kpeobqsrelighmlfydmb.supabase.co';
+        const SUPABASE_ANON_KEY = 'Rsb_publishable_lT7mWSxoki3Pn-zVdzn9EA_imixyik5';
+        const SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // --- VISTA DE LANDING PAGE ---
         function LandingView({ onLogin, onStartFree, quickUrl, setQuickUrl, onQuickTest }) {
             const [isAnnual, setIsAnnual] = useState(true);
@@ -158,7 +163,7 @@
                                 Comenzar Gratis Ahora &rarr;
                             </button>
                             <button onClick={onLogin} className="bg-dark-card border border-dark-border text-gray-300 font-bold px-8 py-3.5 rounded-xl text-xs hover:text-white transition-all cursor-pointer">
-                                Iniciar Sesión Demo
+                                Iniciar Sesión
                             </button>
                         </div>
                     </div>
@@ -201,10 +206,25 @@
 
         // --- MODAL DE INICIO DE SESIÓN ---
         function LoginModal({ isOpen, onClose, onSuccessLogin }) {
-            const [email, setEmail] = useState('');
+            const [email, setEmail] = useState('usuario@clipviral.com');
             const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
 
             if (!isOpen) return null;
+
+            const handleSubmit = async (event) => {
+                event.preventDefault();
+                setError('');
+                setIsSubmitting(true);
+                try {
+                    await onSuccessLogin({ email, password });
+                } catch (loginError) {
+                    setError(loginError.message || 'No se pudo iniciar sesión.');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
 
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -213,19 +233,18 @@
                         <h2 className="text-xl font-bold text-white text-center font-display">Acceso a ClipViral</h2>
                         
                         <div className="bg-dark-card p-3.5 rounded-xl border border-dark-border text-xs text-gray-300 space-y-1">
-                            <span className="text-brand-neon font-bold block">Credenciales Demo Requeridas:</span>
-                            <div>Correo: <strong className="text-white">usuario@clip.com</strong></div>
-                            <div>Clave: <strong className="text-white">654321</strong></div>
+                            <span className="text-brand-neon font-bold block">Acceso con Supabase Auth:</span>
+                            <div>Correo: <strong className="text-white">usuario@clipviral.com</strong></div>
                             <button 
                                 type="button" 
-                                onClick={() => { setEmail('usuario@clip.com'); setPassword('654321'); }}
+                                onClick={() => setEmail('usuario@clipviral.com')}
                                 className="mt-2.5 w-full bg-brand-600/30 text-brand-neon py-1.5 rounded-lg font-bold border border-brand-500/30 text-[11px] hover:bg-brand-600/50 transition-all cursor-pointer"
                             >
-                                Auto-llenar Credenciales Demo
+                                Usar correo del usuario
                             </button>
                         </div>
 
-                        <form onSubmit={(e) => { e.preventDefault(); onSuccessLogin({ email }); }} className="space-y-3">
+                        <form onSubmit={handleSubmit} className="space-y-3">
                             <div>
                                 <label className="text-xs text-gray-300">Correo</label>
                                 <input 
@@ -242,12 +261,14 @@
                                     type="password" 
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
                                     className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
                                     required
                                 />
                             </div>
-                            <button type="submit" className="w-full bg-brand-600 text-white font-bold py-2.5 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer">
-                                Iniciar Sesión
+                            {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+                            <button type="submit" disabled={isSubmitting} className="w-full bg-brand-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer">
+                                {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
                             </button>
                         </form>
                     </div>
@@ -256,8 +277,32 @@
         }
 
         // --- ESTUDIO DE CARGA ---
-        function StudioView({ cleanSilences, setCleanSilences, onProcessLink, projects }) {
+        function StudioView({ cleanSilences, setCleanSilences, onProcessLink, projects, onAnalyzeTranscript }) {
             const [inputUrl, setInputUrl] = useState('');
+            const [transcript, setTranscript] = useState('');
+            const [videoTitle, setVideoTitle] = useState('');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [analysis, setAnalysis] = useState(null);
+            const [analysisError, setAnalysisError] = useState('');
+
+            const handleAnalyze = async (event) => {
+                event.preventDefault();
+                setAnalysis(null);
+                setAnalysisError('');
+                setIsAnalyzing(true);
+
+                try {
+                    const result = await onAnalyzeTranscript({
+                        transcript: transcript.trim(),
+                        title: videoTitle.trim()
+                    });
+                    setAnalysis(result);
+                } catch (error) {
+                    setAnalysisError(error.message || 'No se pudo analizar la transcripción.');
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
 
             return (
                 <div className="p-8 max-w-4xl mx-auto space-y-8">
@@ -265,6 +310,66 @@
                         <h1 className="text-2xl font-bold text-white font-display">Estudio de Carga & Clipping IA</h1>
                         <p className="text-xs text-gray-400">Pega la URL de tu video largo para generar tus clips en segundos.</p>
                     </div>
+
+                    <section className="glass-panel p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4">
+                        <div>
+                            <h2 className="text-base font-bold text-white">Analizar transcripción con IA</h2>
+                            <p className="mt-1 text-xs text-gray-400">Obtén una puntuación de viralidad y tres ganchos para redes sociales.</p>
+                        </div>
+                        <form onSubmit={handleAnalyze} className="space-y-3">
+                            <input
+                                type="text"
+                                value={videoTitle}
+                                onChange={(event) => setVideoTitle(event.target.value)}
+                                maxLength={200}
+                                placeholder="Título del video (opcional)"
+                                aria-label="Título del video"
+                                className="w-full bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
+                            />
+                            <textarea
+                                value={transcript}
+                                onChange={(event) => setTranscript(event.target.value)}
+                                maxLength={50000}
+                                rows={6}
+                                required
+                                placeholder="Pega aquí la transcripción del video..."
+                                aria-label="Transcripción del video"
+                                className="w-full resize-y bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
+                            />
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-[11px] text-gray-500">{transcript.length}/50000 caracteres</span>
+                                <button
+                                    type="submit"
+                                    disabled={isAnalyzing || !transcript.trim()}
+                                    className="bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer"
+                                >
+                                    {isAnalyzing ? 'Analizando...' : 'Analizar transcripción'}
+                                </button>
+                            </div>
+                        </form>
+
+                        {analysisError && (
+                            <p role="alert" className="text-xs text-red-400">{analysisError}</p>
+                        )}
+                        {analysis && (
+                            <div aria-live="polite" className="space-y-3 border-t border-dark-border pt-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h3 className="text-sm font-bold text-white">{analysis.titulo}</h3>
+                                    <span className="shrink-0 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
+                                        {analysis.virality_score}/100
+                                    </span>
+                                </div>
+                                <p className="text-xs leading-relaxed text-gray-300">{analysis.virality_reason}</p>
+                                <div>
+                                    <h4 className="mb-2 text-xs font-bold text-brand-neon">Ganchos sugeridos</h4>
+                                    <ol className="list-inside list-decimal space-y-2 text-xs text-gray-300">
+                                        {analysis.hooks.map((hook, index) => <li key={`${index}-${hook}`}>{hook}</li>)}
+                                    </ol>
+                                </div>
+                                <p className="text-[11px] text-emerald-400">Análisis guardado en Supabase.</p>
+                            </div>
+                        )}
+                    </section>
 
                     <div className="glass-panel p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4 relative">
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -413,6 +518,60 @@
             const [cleanSilences, setCleanSilences] = useState(true);
             const [projects, setProjects] = useState([]);
             const [quickUrl, setQuickUrl] = useState('');
+            const [authError, setAuthError] = useState('');
+
+            useEffect(() => {
+                let isMounted = true;
+                SUPABASE_CLIENT.auth.getSession().then(({ data, error }) => {
+                    if (error) {
+                        console.error('No se pudo recuperar la sesión de Supabase:', error.message);
+                        return;
+                    }
+                    if (isMounted && data.session) {
+                        setIsLoggedIn(true);
+                        setCurrentView('studio');
+                    }
+                });
+
+                const { data: { subscription } } = SUPABASE_CLIENT.auth.onAuthStateChange((_event, session) => {
+                    setIsLoggedIn(Boolean(session));
+                    if (!session) setCurrentView('landing');
+                });
+
+                return () => {
+                    isMounted = false;
+                    subscription.unsubscribe();
+                };
+            }, []);
+
+            const handleAnalyzeTranscript = async ({ transcript, title }) => {
+                if (!transcript) {
+                    throw new Error('Pega una transcripción antes de iniciar el análisis.');
+                }
+                const { data: { session }, error: sessionError } = await SUPABASE_CLIENT.auth.getSession();
+                if (sessionError) throw sessionError;
+                if (!session) throw new Error('Inicia sesión para analizar una transcripción.');
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-transcript`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        apikey: SUPABASE_ANON_KEY,
+                        Authorization: `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({ transcript, title })
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(payload.error || 'No se pudo completar el análisis. Inténtalo de nuevo.');
+                }
+                if (!payload.analysis) {
+                    throw new Error('El servidor devolvió una respuesta de análisis inválida.');
+                }
+
+                return payload.analysis;
+            };
 
             const handleProcessLink = (urlToProcess) => {
                 const targetUrl = urlToProcess || quickUrl;
@@ -431,9 +590,14 @@
                 setCurrentView('editor');
             };
 
-            const handleLoginSuccess = () => {
+            const handleLoginSuccess = async ({ email, password }) => {
+                const { data, error } = await SUPABASE_CLIENT.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                if (!data.session) throw new Error('No se pudo crear una sesión válida.');
+
                 setIsLoggedIn(true);
                 setShowLoginModal(false);
+                setAuthError('');
                 if (quickUrl) {
                     handleProcessLink(quickUrl);
                 } else {
@@ -441,7 +605,12 @@
                 }
             };
 
-            const handleLogout = () => {
+            const handleLogout = async () => {
+                const { error } = await SUPABASE_CLIENT.auth.signOut();
+                if (error) {
+                    setAuthError(`No se pudo cerrar sesión: ${error.message}`);
+                    return;
+                }
                 setIsLoggedIn(false);
                 setCurrentView('landing');
             };
@@ -535,13 +704,13 @@
                     />
 
                     <main className="flex-1">
+                        {authError && (
+                            <p role="alert" className="mx-auto mt-4 max-w-7xl px-6 text-xs text-red-400">{authError}</p>
+                        )}
                         {currentView === 'landing' && (
                             <LandingView 
                                 onLogin={() => setShowLoginModal(true)}
-                                onStartFree={() => { 
-                                    setIsLoggedIn(true); 
-                                    setCurrentView('studio'); 
-                                }}
+                                onStartFree={() => setShowLoginModal(true)}
                                 quickUrl={quickUrl}
                                 setQuickUrl={setQuickUrl}
                                 onQuickTest={() => handleProcessLink(quickUrl)}
@@ -554,6 +723,7 @@
                                 setCleanSilences={setCleanSilences}
                                 onProcessLink={handleProcessLink}
                                 projects={projects}
+                                onAnalyzeTranscript={handleAnalyzeTranscript}
                             />
                         )}
 
