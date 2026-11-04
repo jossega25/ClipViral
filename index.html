@@ -617,7 +617,7 @@
                     if (isMounted && activeUserId === user.id && profile?.nombre) {
                         setUserName(profile.nombre);
                     }
-                });
+                };
 
                 const { data: { subscription } } = SUPABASE_CLIENT.auth.onAuthStateChange((_event, session) => {
                     window.setTimeout(() => {
