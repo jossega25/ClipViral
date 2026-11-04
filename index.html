@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipViral - AI Video Clipping SaaS</title>
+    
+    <!-- Fonts & Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            base: '#09090b',
+                            surface: '#121215',
+                            card: '#18181b',
+                            border: '#27272a'
+                        },
+                        brand: {
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            accent: '#d946ef',
+                            neon: '#a855f7'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(18, 18, 21, 0.75);
+            backdrop-filter: blur(16px);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #d946ef 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .shadow-neon {
+            box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.35);
+        }
+    </style>
+</head>
+<body class="bg-dark-base text-gray-100 min-h-screen overflow-x-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- MOTOR DE ICONOS SVG SEGURO Y DELIMITADO ---
+        const Icon = ({ name, className = "w-4 h-4" }) => {
+            const icons = {
+                'scissors': <g><path d="M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 0l12 12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 0L18 3"/></g>,
+                'sparkles': <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>,
+                'log-out': <g><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></g>,
+                'brain-circuit': <g><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 5.562 5.562A4 4 0 0 0 14.82 14.1 3 3 0 1 0 12 5z"/><path d="M9 12h.01"/><path d="M15 9h.01"/></g>,
+                'type': <g><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></g>,
+                'volume-x': <g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></g>,
+                'user': <g><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g>,
+                'folder': <g><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/></g>,
+                'zap': <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+                'plus': <g><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></g>,
+                'video': <g><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></g>
+            };
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`inline-block flex-shrink-0 ${className}`}>
+                    {icons[name] || <circle cx="12" cy="12" r="10" />}
+                </svg>
+            );
+        };
+
+        const DEMO_CLIP = {
+            id: 'clip-1',
+            title: 'Estrategias de Escalamiento SaaS',
+            duration: '00:45',
+            score: 94,
+            videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+            reason: 'Este segmento presenta una alta densidad de información práctica con un gancho negativo inicial que optimiza la retención.',
+            silenceTrimmed: '3.4s',
+            fillersRemoved: 4,
+            hooks: [
+                { id: 1, type: 'Curiosidad', text: 'El secreto oculto que las grandes marcas no quieren que sepas...' },
+                { id: 2, type: 'Negativo / Alerta', text: '¡Deja de cometer este error si quieres vender este mes!' },
+                { id: 3, type: 'Beneficio Directo', text: 'La estrategia exacta de 3 pasos para escalar tu SaaS hoy.' }
+            ],
+            caption: {
+                text: 'Aprende los pilares fundamentales para hacer crecer tu plataforma sin gastar miles de dólares en anuncios.',
+                emojis: '🔥🚀💡',
+                hashtags: ['#SaaS', '#Emprendimiento', '#ClipViral']
+            }
+        };
+
+        // --- VISTA DE LANDING PAGE ---
+        function LandingView({ onLogin, onStartFree, quickUrl, setQuickUrl, onQuickTest }) {
+            const [isAnnual, setIsAnnual] = useState(true);
+
+            return (
+                <div className="space-y-16 pb-20 max-w-7xl mx-auto px-4">
+                    <div className="pt-16 text-center max-w-4xl mx-auto space-y-6">
+                        <div className="inline-flex items-center gap-2 bg-brand-950/80 border border-brand-500/30 px-4 py-1.5 rounded-full shadow-neon">
+                            <Icon name="sparkles" className="w-4 h-4 text-brand-neon" />
+                            <span className="text-xs font-bold text-brand-neon">Inteligencia Artificial para Clipping Automatizado</span>
+                        </div>
+
+                        <h1 className="text-4xl md:text-6xl font-extrabold text-white font-display leading-tight">
+                            Transforma videos largos en clips virales para TikTok, Reels y Shorts <span className="gradient-text">en segundos</span>
+                        </h1>
+
+                        <p className="text-gray-400 text-sm md:text-base max-w-2xl mx-auto">
+                            Potenciado por IA para transcripción precisa, edición basada en texto, subtítulos animados estilo Submagic y puntuación de retención automatizada.
+                        </p>
+
+                        <div className="max-w-xl mx-auto glass-panel p-2.5 rounded-2xl border border-brand-500/40 shadow-neon">
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <input 
+                                    type="text"
+                                    value={quickUrl}
+                                    onChange={(e) => setQuickUrl(e.target.value)}
+                                    placeholder="Pega un enlace de YouTube aquí..."
+                                    className="flex-1 bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
+                                />
+                                <button 
+                                    onClick={onQuickTest}
+                                    className="bg-gradient-to-r from-brand-600 to-brand-accent text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer"
+                                >
+                                    <Icon name="zap" className="w-4 h-4" />
+                                    Probar Enlace
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center items-center gap-4 pt-2">
+                            <button onClick={onStartFree} className="bg-brand-600 hover:bg-brand-500 text-white font-bold px-8 py-3.5 rounded-xl shadow-neon text-xs transition-all cursor-pointer">
+                                Comenzar Gratis Ahora &rarr;
+                            </button>
+                            <button onClick={onLogin} className="bg-dark-card border border-dark-border text-gray-300 font-bold px-8 py-3.5 rounded-xl text-xs hover:text-white transition-all cursor-pointer">
+                                Iniciar Sesión Demo
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="max-w-4xl mx-auto space-y-8">
+                        <div className="text-center space-y-2">
+                            <h2 className="text-2xl font-bold text-white font-display">Planes y Precios</h2>
+                            <div className="flex items-center justify-center gap-3 pt-2">
+                                <span className={`text-xs ${!isAnnual ? 'text-white font-bold' : 'text-gray-400'}`}>Mensual</span>
+                                <button onClick={() => setIsAnnual(!isAnnual)} className="w-10 h-5 rounded-full bg-brand-600 p-0.5 transition-all">
+                                    <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${isAnnual ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                                <span className={`text-xs ${isAnnual ? 'text-brand-neon font-bold' : 'text-gray-400'}`}>Anual (Pase Pro)</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="glass-panel p-6 rounded-3xl border border-dark-border space-y-4">
+                                <h3 className="text-lg font-bold text-white">Plan Clásico Mensual</h3>
+                                <div className="text-3xl font-extrabold text-white font-display">$15 <span className="text-xs text-gray-400 font-normal">/ mes</span></div>
+                                <p className="text-xs text-brand-neon">Incluye de 150 a 180 créditos/minutos al mes</p>
+                                <button onClick={onLogin} className="w-full bg-dark-card text-white text-xs font-bold py-3 rounded-xl border border-dark-border hover:border-brand-500 transition-all cursor-pointer">
+                                    Elegir Plan Clásico
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-6 rounded-3xl border-2 border-brand-500 space-y-4 relative shadow-neon">
+                                <h3 className="text-lg font-bold text-white">Pase Anual Pro</h3>
+                                <div className="text-3xl font-extrabold text-brand-neon font-display">$9 <span className="text-xs text-gray-400 font-normal">/ mes</span></div>
+                                <p className="text-xs text-gray-400">Facturado anualmente ($108 USD/año)</p>
+                                <button onClick={onLogin} className="w-full bg-gradient-to-r from-brand-600 to-brand-accent text-white text-xs font-bold py-3 rounded-xl shadow-neon transition-all cursor-pointer">
+                                    Obtener Pase Anual Pro ($9/mes)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- MODAL DE INICIO DE SESIÓN ---
+        function LoginModal({ isOpen, onClose, onSuccessLogin }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+                    <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4 relative">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-lg cursor-pointer">&times;</button>
+                        <h2 className="text-xl font-bold text-white text-center font-display">Acceso a ClipViral</h2>
+                        
+                        <div className="bg-dark-card p-3.5 rounded-xl border border-dark-border text-xs text-gray-300 space-y-1">
+                            <span className="text-brand-neon font-bold block">Credenciales Demo Requeridas:</span>
+                            <div>Correo: <strong className="text-white">usuario@clip.com</strong></div>
+                            <div>Clave: <strong className="text-white">654321</strong></div>
+                            <button 
+                                type="button" 
+                                onClick={() => { setEmail('usuario@clip.com'); setPassword('654321'); }}
+                                className="mt-2.5 w-full bg-brand-600/30 text-brand-neon py-1.5 rounded-lg font-bold border border-brand-500/30 text-[11px] hover:bg-brand-600/50 transition-all cursor-pointer"
+                            >
+                                Auto-llenar Credenciales Demo
+                            </button>
+                        </div>
+
+                        <form onSubmit={(e) => { e.preventDefault(); onSuccessLogin({ email }); }} className="space-y-3">
+                            <div>
+                                <label className="text-xs text-gray-300">Correo</label>
+                                <input 
+                                    type="email" 
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-300">Contraseña</label>
+                                <input 
+                                    type="password" 
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
+                                    required
+                                />
+                            </div>
+                            <button type="submit" className="w-full bg-brand-600 text-white font-bold py-2.5 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer">
+                                Iniciar Sesión
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- ESTUDIO DE CARGA ---
+        function StudioView({ cleanSilences, setCleanSilences, onProcessLink, projects }) {
+            const [inputUrl, setInputUrl] = useState('');
+
+            return (
+                <div className="p-8 max-w-4xl mx-auto space-y-8">
+                    <div className="text-center space-y-2">
+                        <h1 className="text-2xl font-bold text-white font-display">Estudio de Carga & Clipping IA</h1>
+                        <p className="text-xs text-gray-400">Pega la URL de tu video largo para generar tus clips en segundos.</p>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4 relative">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input 
+                                type="text" 
+                                value={inputUrl}
+                                onChange={(e) => setInputUrl(e.target.value)}
+                                placeholder="Pega el enlace de YouTube..."
+                                className="flex-1 bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
+                            />
+                            <button onClick={() => onProcessLink(inputUrl)} className="bg-brand-600 text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs flex items-center justify-center gap-2 hover:bg-brand-500 transition-all cursor-pointer">
+                                <Icon name="zap" className="w-4 h-4" />
+                                Generar Clips
+                            </button>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer pt-1">
+                            <input type="checkbox" checked={cleanSilences} onChange={() => setCleanSilences(!cleanSilences)} className="accent-brand-600" />
+                            <span>Limpieza automática de silencios y muletillas (eh, este, o sea)</span>
+                        </label>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h2 className="text-base font-bold text-white flex items-center gap-2">
+                            <Icon name="folder" className="w-4 h-4 text-brand-neon" />
+                            Mis Proyectos Guardados
+                        </h2>
+                        {projects.length === 0 ? (
+                            <div className="glass-panel p-8 rounded-2xl border border-dark-border text-center text-xs text-gray-400 space-y-2">
+                                <Icon name="folder" className="w-8 h-8 text-gray-600 mx-auto" />
+                                <div>No tienes proyectos procesados todavía.</div>
+                                <div className="text-[11px] text-gray-500">Pega una URL de YouTube arriba para procesar tu primer video.</div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {projects.map((p) => (
+                                    <div key={p.id} className="glass-panel p-5 rounded-2xl border border-dark-border text-xs space-y-3 hover:border-brand-500/50 transition-all">
+                                        <div className="flex justify-between items-start">
+                                            <div className="font-bold text-white text-sm truncate max-w-[200px]">{p.name}</div>
+                                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Clipeado</span>
+                                        </div>
+                                        <div className="text-[11px] text-gray-400">Archivos: 1 video original / {p.clips.length} clip(s)</div>
+                                        <button onClick={() => onProcessLink(p.name)} className="w-full bg-brand-600/20 text-brand-neon hover:bg-brand-600 hover:text-white font-bold py-2 rounded-xl transition-all cursor-pointer">
+                                            Abrir Clips &rarr;
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- EDITOR EN ESPACIO DE TRABAJO ---
+        function WorkspaceEditor({ clip, cleanSilences, setCleanSilences }) {
+            const [selectedHook, setSelectedHook] = useState(clip.hooks[0].text);
+
+            return (
+                <div className="p-8 max-w-6xl mx-auto space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-xl font-bold text-white font-display flex items-center gap-2">
+                            <Icon name="scissors" className="w-5 h-5 text-brand-neon" />
+                            {clip.title}
+                        </h1>
+                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full">
+                            <span className="text-xs text-gray-400">Virality Score:</span>
+                            <span className="text-xs font-bold text-emerald-400">{clip.score}/100</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="glass-panel p-4 rounded-3xl border border-dark-border flex flex-col items-center justify-center space-y-4">
+                            <div className="relative w-48 h-80 bg-black rounded-2xl overflow-hidden border border-brand-500/40 shadow-neon flex items-center justify-center">
+                                <video src={clip.videoUrl} controls className="w-full h-full object-cover" />
+                                <div className="absolute top-4 left-2 right-2 bg-black/80 p-2 rounded-lg text-[10px] text-brand-neon font-bold text-center border border-brand-500/30">
+                                    "{selectedHook}"
+                                </div>
+                            </div>
+                            <span className="text-xs text-gray-400">Vista Previa Vertical (9:16)</span>
+                        </div>
+
+                        <div className="lg:col-span-2 space-y-4">
+                            {/* HOOKS */}
+                            <div className="glass-panel p-5 rounded-2xl border border-dark-border space-y-3">
+                                <h3 className="text-xs font-bold text-brand-neon flex items-center gap-2">
+                                    <Icon name="type" className="w-4 h-4" />
+                                    Generador de Hooks & Ganchos Virales
+                                </h3>
+                                <div className="space-y-2">
+                                    {clip.hooks.map((h) => (
+                                        <div 
+                                            key={h.id} 
+                                            onClick={() => setSelectedHook(h.text)}
+                                            className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                                                selectedHook === h.text 
+                                                    ? 'bg-brand-600/20 border-brand-500 text-white shadow-neon' 
+                                                    : 'bg-dark-base border-dark-border text-gray-300 hover:border-gray-600'
+                                            }`}
+                                        >
+                                            <span className="text-[10px] text-brand-neon font-bold block">{h.type}</span>
+                                            {h.text}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* SILENCIOS */}
+                            <div className="glass-panel p-5 rounded-2xl border border-dark-border space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-xs font-bold text-brand-neon flex items-center gap-2">
+                                        <Icon name="volume-x" className="w-4 h-4" />
+                                        Limpiador de Silencios & Muletillas
+                                    </h3>
+                                    <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                        <input type="checkbox" checked={cleanSilences} onChange={() => setCleanSilences(!cleanSilences)} className="accent-brand-600" />
+                                        <span>Activo</span>
+                                    </label>
+                                </div>
+                                <div className="text-xs text-gray-400 flex gap-4 bg-dark-base p-3 rounded-xl border border-dark-border">
+                                    <div>Silencios recortados: <strong className="text-white">{clip.silenceTrimmed}</strong></div>
+                                    <div>Muletillas eliminadas: <strong className="text-white">{clip.fillersRemoved}</strong></div>
+                                </div>
+                            </div>
+
+                            {/* RAZÓN DE VIRALIDAD */}
+                            <div className="glass-panel p-5 rounded-2xl border border-dark-border space-y-2">
+                                <h3 className="text-xs font-bold text-brand-neon flex items-center gap-2">
+                                    <Icon name="brain-circuit" className="w-4 h-4" />
+                                    ¿Por qué este segmento es viral?
+                                </h3>
+                                <p className="text-xs text-gray-300 leading-relaxed bg-dark-base p-3 rounded-xl border border-dark-border">
+                                    {clip.reason}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- CONTROLADOR PRINCIPAL ---
+        function App() {
+            const [currentView, setCurrentView] = useState('landing');
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [showLoginModal, setShowLoginModal] = useState(false);
+            const [cleanSilences, setCleanSilences] = useState(true);
+            const [projects, setProjects] = useState([]);
+            const [quickUrl, setQuickUrl] = useState('');
+
+            const handleProcessLink = (urlToProcess) => {
+                const targetUrl = urlToProcess || quickUrl;
+                if (!isLoggedIn) {
+                    setShowLoginModal(true);
+                    return;
+                }
+                const newProj = {
+                    id: `proj-${Date.now()}`,
+                    name: targetUrl || 'Nuevo Proyecto de Clip',
+                    date: 'Ahora mismo',
+                    status: 'clipped',
+                    clips: [DEMO_CLIP]
+                };
+                setProjects([newProj, ...projects]);
+                setCurrentView('editor');
+            };
+
+            const handleLoginSuccess = () => {
+                setIsLoggedIn(true);
+                setShowLoginModal(false);
+                if (quickUrl) {
+                    handleProcessLink(quickUrl);
+                } else {
+                    setCurrentView('studio');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsLoggedIn(false);
+                setCurrentView('landing');
+            };
+
+            return (
+                <div className="min-h-screen bg-dark-base flex flex-col justify-between">
+                    {/* BARRA DE NAVEGACIÓN SUPERIOR CON MENÚ CENTRALIZADO */}
+                    <header className="sticky top-0 z-40 glass-panel border-b border-dark-border/80">
+                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                            {/* LOGO */}
+                            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentView(isLoggedIn ? 'studio' : 'landing')}>
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-700 to-brand-accent p-0.5 shadow-neon flex items-center justify-center">
+                                    <div className="w-full h-full bg-dark-base rounded-[9px] flex items-center justify-center">
+                                        <Icon name="scissors" className="w-4 h-4 text-brand-neon" />
+                                    </div>
+                                </div>
+                                <span className="font-display font-bold text-xl text-white">Clip<span className="gradient-text">Viral</span></span>
+                            </div>
+
+                            {/* MENÚ CENTRALIZADO (Solo visible al Iniciar Sesión) */}
+                            {isLoggedIn && (
+                                <nav className="flex items-center gap-1 bg-dark-surface/90 border border-dark-border/80 p-1 rounded-2xl shadow-neon">
+                                    <button
+                                        onClick={() => setCurrentView('studio')}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            currentView === 'studio'
+                                                ? 'bg-brand-600 text-white shadow-neon'
+                                                : 'text-gray-400 hover:text-white hover:bg-dark-card'
+                                        }`}
+                                    >
+                                        <Icon name="plus" className="w-3.5 h-3.5" />
+                                        Estudio
+                                    </button>
+
+                                    <button
+                                        onClick={() => setCurrentView('editor')}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            currentView === 'editor'
+                                                ? 'bg-brand-600 text-white shadow-neon'
+                                                : 'text-gray-400 hover:text-white hover:bg-dark-card'
+                                        }`}
+                                    >
+                                        <Icon name="video" className="w-3.5 h-3.5" />
+                                        Editor IA
+                                    </button>
+
+                                    <button
+                                        onClick={() => setCurrentView('studio')}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            currentView === 'projects'
+                                                ? 'bg-brand-600 text-white shadow-neon'
+                                                : 'text-gray-400 hover:text-white hover:bg-dark-card'
+                                        }`}
+                                    >
+                                        <Icon name="folder" className="w-3.5 h-3.5" />
+                                        <span>Proyectos</span>
+                                        <span className="bg-brand-500/20 text-brand-neon text-[10px] px-1.5 py-0.5 rounded-full font-extrabold">
+                                            {projects.length}
+                                        </span>
+                                    </button>
+                                </nav>
+                            )}
+
+                            {/* BOTÓN SESIÓN */}
+                            <div className="flex items-center gap-4">
+                                {!isLoggedIn ? (
+                                    <button 
+                                        onClick={() => setShowLoginModal(true)}
+                                        className="bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-neon transition-all flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Icon name="user" className="w-4 h-4" />
+                                        Iniciar Sesión
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={handleLogout}
+                                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Icon name="log-out" className="w-3.5 h-3.5" />
+                                        Salir
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    <LoginModal 
+                        isOpen={showLoginModal} 
+                        onClose={() => setShowLoginModal(false)} 
+                        onSuccessLogin={handleLoginSuccess} 
+                    />
+
+                    <main className="flex-1">
+                        {currentView === 'landing' && (
+                            <LandingView 
+                                onLogin={() => setShowLoginModal(true)}
+                                onStartFree={() => { 
+                                    setIsLoggedIn(true); 
+                                    setCurrentView('studio'); 
+                                }}
+                                quickUrl={quickUrl}
+                                setQuickUrl={setQuickUrl}
+                                onQuickTest={() => handleProcessLink(quickUrl)}
+                            />
+                        )}
+
+                        {currentView === 'studio' && isLoggedIn && (
+                            <StudioView 
+                                cleanSilences={cleanSilences}
+                                setCleanSilences={setCleanSilences}
+                                onProcessLink={handleProcessLink}
+                                projects={projects}
+                            />
+                        )}
+
+                        {currentView === 'editor' && isLoggedIn && (
+                            <WorkspaceEditor 
+                                clip={DEMO_CLIP} 
+                                cleanSilences={cleanSilences} 
+                                setCleanSilences={setCleanSilences} 
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
