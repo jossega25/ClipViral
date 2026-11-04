@@ -148,7 +148,7 @@
                                     placeholder="Pega un enlace de YouTube aquí..."
                                     className="flex-1 bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
                                 />
-                                <button 
+                                <button
                                     onClick={onQuickTest}
                                     className="bg-gradient-to-r from-brand-600 to-brand-accent text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-all cursor-pointer"
                                 >
@@ -204,23 +204,59 @@
             );
         }
 
-        // --- MODAL DE INICIO DE SESIÓN ---
-        function LoginModal({ isOpen, onClose, onSuccessLogin }) {
-            const [email, setEmail] = useState('usuario@clipviral.com');
+        // --- MODAL DE AUTENTICACIÓN ---
+        function LoginModal({ isOpen, onClose, onSuccessLogin, onRegister }) {
+            const [activeTab, setActiveTab] = useState('login');
+            const [name, setName] = useState('');
+            const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
+            const [notice, setNotice] = useState('');
             const [isSubmitting, setIsSubmitting] = useState(false);
 
             if (!isOpen) return null;
 
+            const selectTab = (tab) => {
+                setActiveTab(tab);
+                setError('');
+                setNotice('');
+            };
+
             const handleSubmit = async (event) => {
                 event.preventDefault();
                 setError('');
+                setNotice('');
+                if (activeTab === 'register' && password.length < 6) {
+                    setError('La contraseña debe tener al menos 6 caracteres.');
+                    return;
+                }
+
                 setIsSubmitting(true);
                 try {
-                    await onSuccessLogin({ email, password });
-                } catch (loginError) {
-                    setError(loginError.message || 'No se pudo iniciar sesión.');
+                    if (activeTab === 'register') {
+                        const result = await onRegister({ name: name.trim(), email: email.trim(), password });
+                        if (result.requiresEmailConfirmation) {
+                            setNotice('Cuenta creada. Revisa tu correo para confirmar la dirección e iniciar sesión.');
+                            setPassword('');
+                        }
+                    } else {
+                        await onSuccessLogin({ email: email.trim(), password });
+                    }
+                } catch (authError) {
+                    const message = authError.message || '';
+                    if (/already registered|already been registered|user exists/i.test(message)) {
+                        setError('Ese correo ya está registrado. Inicia sesión o usa otro correo.');
+                    } else if (/invalid login credentials|invalid credentials/i.test(message)) {
+                        setError('Correo o contraseña incorrectos.');
+                    } else if (/password.*(weak|short|at least)|weak password/i.test(message)) {
+                        setError('La contraseña no cumple los requisitos. Usa al menos 6 caracteres.');
+                    } else if (/invalid email/i.test(message)) {
+                        setError('Introduce un correo electrónico válido.');
+                    } else {
+                        setError(message || (activeTab === 'register'
+                            ? 'No se pudo completar el registro.'
+                            : 'No se pudo iniciar sesión.'));
+                    }
                 } finally {
                     setIsSubmitting(false);
                 }
@@ -230,45 +266,76 @@
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4 relative">
                         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-lg cursor-pointer">&times;</button>
-                        <h2 className="text-xl font-bold text-white text-center font-display">Acceso a ClipViral</h2>
-                        
-                        <div className="bg-dark-card p-3.5 rounded-xl border border-dark-border text-xs text-gray-300 space-y-1">
-                            <span className="text-brand-neon font-bold block">Acceso con Supabase Auth:</span>
-                            <div>Correo: <strong className="text-white">usuario@clipviral.com</strong></div>
-                            <button 
-                                type="button" 
-                                onClick={() => setEmail('usuario@clipviral.com')}
-                                className="mt-2.5 w-full bg-brand-600/30 text-brand-neon py-1.5 rounded-lg font-bold border border-brand-500/30 text-[11px] hover:bg-brand-600/50 transition-all cursor-pointer"
+                        <h2 className="text-xl font-bold text-white text-center font-display">Bienvenido a ClipViral</h2>
+
+                        <div className="grid grid-cols-2 gap-1 rounded-xl border border-dark-border bg-dark-base p-1" role="tablist" aria-label="Autenticación">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={activeTab === 'login'}
+                                onClick={() => selectTab('login')}
+                                className={`rounded-lg py-2 text-xs font-bold transition-all ${activeTab === 'login' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
                             >
-                                Usar correo del usuario
+                                Iniciar Sesión
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={activeTab === 'register'}
+                                onClick={() => selectTab('register')}
+                                className={`rounded-lg py-2 text-xs font-bold transition-all ${activeTab === 'register' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Registrarse
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-3">
+                            {activeTab === 'register' && (
+                                <div>
+                                    <label htmlFor="auth-name" className="text-xs text-gray-300">Nombre completo</label>
+                                    <input
+                                        id="auth-name"
+                                        type="text"
+                                        value={name}
+                                        onChange={(event) => setName(event.target.value)}
+                                        maxLength={120}
+                                        autoComplete="name"
+                                        className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
+                                        required
+                                    />
+                                </div>
+                            )}
                             <div>
-                                <label className="text-xs text-gray-300">Correo</label>
+                                <label htmlFor="auth-email" className="text-xs text-gray-300">Correo electrónico</label>
                                 <input 
+                                    id="auth-email"
                                     type="email" 
                                     value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    onChange={(event) => setEmail(event.target.value)}
+                                    autoComplete="email"
                                     className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-gray-300">Contraseña</label>
+                                <label htmlFor="auth-password" className="text-xs text-gray-300">Contraseña</label>
                                 <input 
+                                    id="auth-password"
                                     type="password" 
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    autoComplete="current-password"
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    autoComplete={activeTab === 'register' ? 'new-password' : 'current-password'}
+                                    minLength={activeTab === 'register' ? 6 : undefined}
                                     className="w-full bg-dark-base border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500"
                                     required
                                 />
                             </div>
+                            {notice && <p role="status" className="text-xs text-emerald-400">{notice}</p>}
                             {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
                             <button type="submit" disabled={isSubmitting} className="w-full bg-brand-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer">
-                                {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
+                                {isSubmitting
+                                    ? (activeTab === 'register' ? 'Creando cuenta...' : 'Verificando...')
+                                    : (activeTab === 'register' ? 'Crear cuenta' : 'Iniciar Sesión')}
                             </button>
                         </form>
                     </div>
@@ -519,23 +586,50 @@
             const [projects, setProjects] = useState([]);
             const [quickUrl, setQuickUrl] = useState('');
             const [authError, setAuthError] = useState('');
+            const [userName, setUserName] = useState('');
 
             useEffect(() => {
                 let isMounted = true;
+                let activeUserId = null;
+
+                const updateSession = async (session) => {
+                    const user = session?.user || null;
+                    activeUserId = user?.id || null;
+                    setIsLoggedIn(Boolean(user));
+
+                    if (!user) {
+                        setUserName('');
+                        setCurrentView('landing');
+                        return;
+                    }
+
+                    setUserName(user.email || 'Usuario');
+                    setCurrentView((view) => view === 'landing' ? 'studio' : view);
+                    const { data: profile, error } = await SUPABASE_CLIENT
+                        .from('profiles')
+                        .select('nombre')
+                        .eq('id', user.id)
+                        .maybeSingle();
+                    if (error) {
+                        console.error('No se pudo cargar el nombre del perfil:', error.message);
+                        return;
+                    }
+                    if (isMounted && activeUserId === user.id && profile?.nombre) {
+                        setUserName(profile.nombre);
+                    }
+                });
+
+                const { data: { subscription } } = SUPABASE_CLIENT.auth.onAuthStateChange((_event, session) => {
+                    window.setTimeout(() => {
+                        if (isMounted) void updateSession(session);
+                    }, 0);
+                });
                 SUPABASE_CLIENT.auth.getSession().then(({ data, error }) => {
                     if (error) {
                         console.error('No se pudo recuperar la sesión de Supabase:', error.message);
                         return;
                     }
-                    if (isMounted && data.session) {
-                        setIsLoggedIn(true);
-                        setCurrentView('studio');
-                    }
-                });
-
-                const { data: { subscription } } = SUPABASE_CLIENT.auth.onAuthStateChange((_event, session) => {
-                    setIsLoggedIn(Boolean(session));
-                    if (!session) setCurrentView('landing');
+                    if (isMounted) void updateSession(data.session);
                 });
 
                 return () => {
@@ -590,6 +684,31 @@
                 } else {
                     setCurrentView('studio');
                 }
+            };
+
+            const handleRegister = async ({ name, email, password }) => {
+                if (!name.trim()) throw new Error('Escribe tu nombre completo.');
+                if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres.');
+
+                const { data, error } = await SUPABASE_CLIENT.auth.signUp({ email, password });
+                if (error) throw error;
+                if (!data.user) throw new Error('Supabase no devolvió el usuario creado.');
+
+                const { error: profileError } = await SUPABASE_CLIENT
+                    .from('profiles')
+                    .insert([{ id: data.user.id, nombre: name, email }]);
+                if (profileError) {
+                    throw new Error(`La cuenta se creó, pero no se pudo guardar el perfil: ${profileError.message}`);
+                }
+
+                setUserName(name);
+                setAuthError('');
+                if (data.session) {
+                    setIsLoggedIn(true);
+                    setShowLoginModal(false);
+                    setCurrentView('studio');
+                }
+                return { requiresEmailConfirmation: !data.session };
             };
 
             const handleLogout = async () => {
@@ -672,13 +791,18 @@
                                         Iniciar Sesión
                                     </button>
                                 ) : (
-                                    <button 
-                                        onClick={handleLogout}
-                                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <Icon name="log-out" className="w-3.5 h-3.5" />
-                                        Salir
-                                    </button>
+                                    <>
+                                        <span className="hidden max-w-48 truncate text-xs font-semibold text-gray-300 sm:block" title={userName}>
+                                            {userName || 'Usuario'}
+                                        </span>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                                        >
+                                            <Icon name="log-out" className="w-3.5 h-3.5" />
+                                            Cerrar sesión
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -688,6 +812,7 @@
                         isOpen={showLoginModal} 
                         onClose={() => setShowLoginModal(false)} 
                         onSuccessLogin={handleLoginSuccess} 
+                        onRegister={handleRegister}
                     />
 
                     <main className="flex-1">
