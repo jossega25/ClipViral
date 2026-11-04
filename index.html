@@ -548,29 +548,16 @@
                 if (!transcript) {
                     throw new Error('Pega una transcripción antes de iniciar el análisis.');
                 }
-                const { data: { session }, error: sessionError } = await SUPABASE_CLIENT.auth.getSession();
-                if (sessionError) throw sessionError;
-                if (!session) throw new Error('Inicia sesión para analizar una transcripción.');
-
-                const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-transcript`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        apikey: SUPABASE_ANON_KEY,
-                        Authorization: `Bearer ${session.access_token}`
-                    },
-                    body: JSON.stringify({ transcript, title })
+                const { data, error } = await SUPABASE_CLIENT.functions.invoke('analyze-transcript', {
+                    body: { transcript, title }
                 });
-                const payload = await response.json().catch(() => ({}));
 
-                if (!response.ok) {
-                    throw new Error(payload.error || 'No se pudo completar el análisis. Inténtalo de nuevo.');
-                }
-                if (!payload.analysis) {
+                if (error) throw error;
+                if (!data?.analysis) {
                     throw new Error('El servidor devolvió una respuesta de análisis inválida.');
                 }
 
-                return payload.analysis;
+                return data.analysis;
             };
 
             const handleProcessLink = (urlToProcess) => {
