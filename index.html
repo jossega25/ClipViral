@@ -344,26 +344,94 @@
         }
 
         // --- ESTUDIO DE CARGA ---
-        function StudioView({ cleanSilences, setCleanSilences, onProcessLink, projects, onAnalyzeTranscript }) {
+        function StudioView({ cleanSilences, setCleanSilences, onProcessLink, projects, onGenerateClips }) {
+            const [inputMode, setInputMode] = useState('link');
             const [inputUrl, setInputUrl] = useState('');
+            const [selectedFile, setSelectedFile] = useState(null);
+            const [previewUrl, setPreviewUrl] = useState('');
+            const [isDragging, setIsDragging] = useState(false);
+            const [videoError, setVideoError] = useState('');
             const [transcript, setTranscript] = useState('');
             const [videoTitle, setVideoTitle] = useState('');
             const [isAnalyzing, setIsAnalyzing] = useState(false);
             const [analysis, setAnalysis] = useState(null);
             const [analysisError, setAnalysisError] = useState('');
 
-            const handleAnalyze = async (event) => {
+            useEffect(() => {
+                if (!selectedFile) {
+                    setPreviewUrl('');
+                    return undefined;
+                }
+
+                const objectUrl = URL.createObjectURL(selectedFile);
+                setPreviewUrl(objectUrl);
+                return () => URL.revokeObjectURL(objectUrl);
+            }, [selectedFile]);
+
+            const setVideoFile = (file) => {
+                setVideoError('');
+                if (!file) return;
+
+                const validType = ['video/mp4', 'video/quicktime', 'video/webm'].includes(file.type)
+                    || /\.(mp4|mov|webm)$/i.test(file.name);
+                if (!validType) {
+                    setSelectedFile(null);
+                    setVideoError('Selecciona un video MP4, MOV o WEBM.');
+                    return;
+                }
+                if (file.size > 50 * 1024 * 1024) {
+                    setSelectedFile(null);
+                    setVideoError('El archivo supera el límite de 50 MB.');
+                    return;
+                }
+
+                setSelectedFile(file);
+            };
+
+            const handleGenerate = async (event) => {
                 event.preventDefault();
                 setAnalysis(null);
                 setAnalysisError('');
+
+                let sourceUrl = '';
+                if (inputMode === 'link') {
+                    try {
+                        const parsedUrl = new URL(inputUrl.trim());
+                        const host = parsedUrl.hostname.toLowerCase();
+                        const isSupportedHost = host === 'youtu.be'
+                            || host === 'youtube.com'
+                            || host.endsWith('.youtube.com')
+                            || host === 'kick.com'
+                            || host.endsWith('.kick.com');
+                        if (!['http:', 'https:'].includes(parsedUrl.protocol) || !isSupportedHost) {
+                            throw new Error();
+                        }
+                        sourceUrl = parsedUrl.toString();
+                    } catch {
+                        setAnalysisError('Introduce un enlace válido de YouTube o Kick.');
+                        return;
+                    }
+                } else if (!selectedFile) {
+                    setAnalysisError('Selecciona un archivo de video para continuar.');
+                    return;
+                }
+
+                if (!transcript.trim()) {
+                    setAnalysisError('Pega la transcripción del video para que Gemini pueda analizarla.');
+                    return;
+                }
+
                 setIsAnalyzing(true);
 
                 try {
-                    const result = await onAnalyzeTranscript({
+                    const result = await onGenerateClips({
                         transcript: transcript.trim(),
-                        title: videoTitle.trim()
+                        title: videoTitle.trim(),
+                        sourceType: inputMode,
+                        sourceUrl,
+                        fileName: inputMode === 'file' ? selectedFile?.name || '' : ''
                     });
-                    setAnalysis(result);
+                    setAnalysis(result.analysis);
                 } catch (error) {
                     setAnalysisError(error.message || 'No se pudo analizar la transcripción.');
                 } finally {
@@ -375,25 +443,89 @@
                 <div className="p-8 max-w-4xl mx-auto space-y-8">
                     <div className="text-center space-y-2">
                         <h1 className="text-2xl font-bold text-white font-display">Estudio de Carga & Clipping IA</h1>
-                        <p className="text-xs text-gray-400">Pega la URL de tu video largo para generar tus clips en segundos.</p>
+                        <p className="text-xs text-gray-400">Elige una fuente, pega su transcripción y guarda el análisis en tus proyectos.</p>
                     </div>
 
                     <section className="glass-panel p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4">
                         <div>
-                            <h2 className="text-base font-bold text-white">Analizar transcripción con IA</h2>
-                            <p className="mt-1 text-xs text-gray-400">Obtén una puntuación de viralidad y tres ganchos para redes sociales.</p>
+                            <h2 className="text-base font-bold text-white">Entrada de video</h2>
+                            <p className="mt-1 text-xs text-gray-400">El archivo local solo se previsualiza en este navegador; no se sube a Storage.</p>
                         </div>
-                        <form onSubmit={handleAnalyze} className="space-y-3">
+                        <div className="grid grid-cols-2 gap-1 rounded-xl border border-dark-border bg-dark-base p-1" role="tablist" aria-label="Método de entrada">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={inputMode === 'link'}
+                                onClick={() => { setInputMode('link'); setSelectedFile(null); setAnalysisError(''); }}
+                                className={`rounded-lg py-2.5 text-xs font-bold transition-all ${inputMode === 'link' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Enlace (YouTube / Kick)
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={inputMode === 'file'}
+                                onClick={() => { setInputMode('file'); setAnalysisError(''); }}
+                                className={`rounded-lg py-2.5 text-xs font-bold transition-all ${inputMode === 'file' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Subir archivo
+                            </button>
+                        </div>
+                        <form onSubmit={handleGenerate} className="space-y-3">
+                            {inputMode === 'link' ? (
+                                <input
+                                    type="url"
+                                    value={inputUrl}
+                                    onChange={(event) => setInputUrl(event.target.value)}
+                                    placeholder="https://youtube.com/... o https://kick.com/..."
+                                    aria-label="Enlace del video"
+                                    className="w-full bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
+                                    required
+                                />
+                            ) : (
+                                <div
+                                    onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={(event) => {
+                                        event.preventDefault();
+                                        setIsDragging(false);
+                                        setVideoFile(event.dataTransfer.files[0]);
+                                    }}
+                                    className={`space-y-3 rounded-xl border border-dashed p-5 text-center transition-colors ${isDragging ? 'border-brand-500 bg-brand-600/10' : 'border-dark-border bg-dark-base'}`}
+                                >
+                                    <label className="block cursor-pointer text-xs text-gray-300">
+                                        <span className="font-bold text-brand-neon">Arrastra un video aquí</span> o selecciona un archivo
+                                        <input
+                                            type="file"
+                                            accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+                                            aria-label="Seleccionar video"
+                                            onChange={(event) => setVideoFile(event.target.files[0])}
+                                            className="mt-3 block w-full text-xs text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white"
+                                        />
+                                    </label>
+                                    <p className="text-[11px] text-gray-500">MP4, MOV o WEBM · máximo 50 MB · vista previa local</p>
+                                    {videoError && <p role="alert" className="text-xs text-red-400">{videoError}</p>}
+                                    {selectedFile && (
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-gray-300">{selectedFile.name} · {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                            {previewUrl && <video src={previewUrl} controls className="mx-auto max-h-64 max-w-full rounded-xl border border-dark-border" />}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             <input
                                 type="text"
                                 value={videoTitle}
                                 onChange={(event) => setVideoTitle(event.target.value)}
                                 maxLength={200}
-                                placeholder="Título del video (opcional)"
+                                placeholder="Nombre del proyecto (opcional)"
                                 aria-label="Título del video"
                                 className="w-full bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
                             />
+                            <div>
+                                <label htmlFor="video-transcript" className="mb-2 block text-xs font-bold text-gray-300">Transcripción para analizar con Gemini</label>
                             <textarea
+                                id="video-transcript"
                                 value={transcript}
                                 onChange={(event) => setTranscript(event.target.value)}
                                 maxLength={50000}
@@ -403,16 +535,21 @@
                                 aria-label="Transcripción del video"
                                 className="w-full resize-y bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
                             />
+                            </div>
                             <div className="flex items-center justify-between gap-3">
                                 <span className="text-[11px] text-gray-500">{transcript.length}/50000 caracteres</span>
                                 <button
                                     type="submit"
-                                    disabled={isAnalyzing || !transcript.trim()}
+                                    disabled={isAnalyzing}
                                     className="bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs hover:bg-brand-500 transition-all cursor-pointer"
                                 >
-                                    {isAnalyzing ? 'Analizando...' : 'Analizar transcripción'}
+                                    {isAnalyzing ? 'Analizando...' : 'Analizar y guardar proyecto'}
                                 </button>
                             </div>
+                            <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer pt-1">
+                                <input type="checkbox" checked={cleanSilences} onChange={() => setCleanSilences(!cleanSilences)} className="accent-brand-600" />
+                                <span>Limpieza automática de silencios y muletillas</span>
+                            </label>
                         </form>
 
                         {analysisError && (
@@ -433,30 +570,10 @@
                                         {analysis.hooks.map((hook, index) => <li key={`${index}-${hook}`}>{hook}</li>)}
                                     </ol>
                                 </div>
-                                <p className="text-[11px] text-emerald-400">Análisis guardado en Supabase.</p>
+                                <p className="text-[11px] text-emerald-400">Análisis guardado en videos_analizados y proyecto guardado en projects.</p>
                             </div>
                         )}
                     </section>
-
-                    <div className="glass-panel p-6 rounded-3xl border border-brand-500/40 shadow-neon space-y-4 relative">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <input 
-                                type="text" 
-                                value={inputUrl}
-                                onChange={(e) => setInputUrl(e.target.value)}
-                                placeholder="Pega el enlace de YouTube..."
-                                className="flex-1 bg-dark-base border border-dark-border rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500"
-                            />
-                            <button onClick={() => onProcessLink(inputUrl)} className="bg-brand-600 text-white font-bold px-6 py-3 rounded-xl shadow-neon text-xs flex items-center justify-center gap-2 hover:bg-brand-500 transition-all cursor-pointer">
-                                <Icon name="zap" className="w-4 h-4" />
-                                Generar Clips
-                            </button>
-                        </div>
-                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer pt-1">
-                            <input type="checkbox" checked={cleanSilences} onChange={() => setCleanSilences(!cleanSilences)} className="accent-brand-600" />
-                            <span>Limpieza automática de silencios y muletillas (eh, este, o sea)</span>
-                        </label>
-                    </div>
 
                     <div className="space-y-4">
                         <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -467,17 +584,17 @@
                             <div className="glass-panel p-8 rounded-2xl border border-dark-border text-center text-xs text-gray-400 space-y-2">
                                 <Icon name="folder" className="w-8 h-8 text-gray-600 mx-auto" />
                                 <div>No tienes proyectos procesados todavía.</div>
-                                <div className="text-[11px] text-gray-500">Pega una URL de YouTube arriba para procesar tu primer video.</div>
+                                <div className="text-[11px] text-gray-500">Usa un enlace o selecciona un video para guardar tu primer proyecto.</div>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {projects.map((p) => (
                                     <div key={p.id} className="glass-panel p-5 rounded-2xl border border-dark-border text-xs space-y-3 hover:border-brand-500/50 transition-all">
                                         <div className="flex justify-between items-start">
-                                            <div className="font-bold text-white text-sm truncate max-w-[200px]">{p.name}</div>
+                                            <div className="font-bold text-white text-sm truncate max-w-[200px]">{p.name || p.title || 'Proyecto'}</div>
                                             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Clipeado</span>
                                         </div>
-                                        <div className="text-[11px] text-gray-400">Archivos: 1 video original / {p.clips.length} clip(s)</div>
+                                            <div className="text-[11px] text-gray-400">Archivos: {p.clips?.length || 0} clip(s)</div>
                                         <button onClick={() => onProcessLink(p.name)} className="w-full bg-brand-600/20 text-brand-neon hover:bg-brand-600 hover:text-white font-bold py-2 rounded-xl transition-all cursor-pointer">
                                             Abrir Clips &rarr;
                                         </button>
@@ -599,6 +716,8 @@
 
                     if (!user) {
                         setUserName('');
+                        setProjects([]);
+                        setAuthError('');
                         setCurrentView('landing');
                         return;
                     }
@@ -612,10 +731,27 @@
                         .maybeSingle();
                     if (error) {
                         console.error('No se pudo cargar el nombre del perfil:', error.message);
+                    } else if (isMounted && activeUserId === user.id && profile?.nombre) {
+                        setUserName(profile.nombre);
+                    }
+
+                    const { data: savedProjects, error: projectsError } = await SUPABASE_CLIENT
+                        .from('projects')
+                        .select('*')
+                        .eq('user_id', user.id);
+                    if (projectsError) {
+                        if (isMounted && activeUserId === user.id) {
+                            setAuthError(`No se pudieron cargar tus proyectos: ${projectsError.message}`);
+                        }
                         return;
                     }
-                    if (isMounted && activeUserId === user.id && profile?.nombre) {
-                        setUserName(profile.nombre);
+                    if (isMounted && activeUserId === user.id) {
+                        setProjects(savedProjects.map((project) => ({
+                            ...project,
+                            name: project.name || project.title || 'Proyecto',
+                            clips: project.clips || []
+                        })));
+                        setAuthError('');
                     }
                 };
 
@@ -638,10 +774,14 @@
                 };
             }, []);
 
-            const handleAnalyzeTranscript = async ({ transcript, title }) => {
+            const handleGenerateClips = async ({ transcript, title, sourceUrl, fileName }) => {
                 if (!transcript) {
                     throw new Error('Pega una transcripción antes de iniciar el análisis.');
                 }
+                const { data: { session }, error: sessionError } = await SUPABASE_CLIENT.auth.getSession();
+                if (sessionError) throw sessionError;
+                if (!session?.user) throw new Error('Inicia sesión para generar y guardar un proyecto.');
+
                 const { data, error } = await SUPABASE_CLIENT.functions.invoke('analyze-transcript', {
                     body: { transcript, title }
                 });
@@ -651,7 +791,22 @@
                     throw new Error('El servidor devolvió una respuesta de análisis inválida.');
                 }
 
-                return data.analysis;
+                const projectName = title || fileName || sourceUrl || 'Nuevo Proyecto de Clip';
+                const { data: savedProject, error: projectError } = await SUPABASE_CLIENT
+                    .from('projects')
+                    .insert([{ user_id: session.user.id, name: projectName }])
+                    .select()
+                    .single();
+
+                if (projectError) {
+                    throw new Error(`El análisis se guardó, pero no se pudo guardar el proyecto: ${projectError.message}`);
+                }
+
+                setProjects((currentProjects) => [
+                    { ...savedProject, name: savedProject.name || projectName, clips: [] },
+                    ...currentProjects
+                ]);
+                return { analysis: data.analysis };
             };
 
             const handleProcessLink = (urlToProcess) => {
@@ -835,7 +990,7 @@
                                 setCleanSilences={setCleanSilences}
                                 onProcessLink={handleProcessLink}
                                 projects={projects}
-                                onAnalyzeTranscript={handleAnalyzeTranscript}
+                                onGenerateClips={handleGenerateClips}
                             />
                         )}
 
